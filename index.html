@@ -501,6 +501,22 @@
   </section>
 </main>
 
+<!-- GATE DE SENHA -->
+<div class="overlay aberto" id="overlay-senha" style="z-index:999; background:var(--page-bg);">
+  <div class="modal" style="max-width:340px;">
+    <div class="modal-header">
+      <h2 style="margin:0; font-size:1.05rem;">Acesso restrito</h2>
+    </div>
+    <form id="form-senha">
+      <label>Senha
+        <input type="password" id="input-senha" autocomplete="current-password" required autofocus>
+      </label>
+      <div id="senha-erro" style="display:none; color:var(--critical-text); font-size:0.8rem;">Senha incorreta.</div>
+      <button type="submit" class="btn-primary">Entrar</button>
+    </form>
+  </div>
+</div>
+
 <!-- MODAL: novo cliente -->
 <div class="overlay" id="overlay-novo-cliente">
   <div class="modal">
@@ -568,16 +584,21 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function () {
-  const CLIENTES_KEY = "glp-clientes";
-  const LANCAMENTOS_KEY = "glp-lancamentos";
-  const COTACAO_KEY = "glp-cotacao";
+  const SUPABASE_URL = "https://ukwncfxgbrjqnaycvakr.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_XFNf9ptUPRTWb4CQXA-26Q_sxlhnxCg";
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const SENHA_ACESSO = "2805";
+  const UNLOCK_KEY = "glp-unlocked";
+
   const SLOTS = ["var(--slot-1)", "var(--slot-2)", "var(--slot-3)", "var(--slot-4)", "var(--slot-5)"];
 
-  let clientes = JSON.parse(localStorage.getItem(CLIENTES_KEY) || "[]");
-  let lancamentos = JSON.parse(localStorage.getItem(LANCAMENTOS_KEY) || "[]");
-  let cotacao = JSON.parse(localStorage.getItem(COTACAO_KEY) || "null") || { valor: 5.40, atualizadoEm: null };
+  let clientes = [];
+  let lancamentos = [];
+  let cotacao = { valor: 5.40, atualizadoEm: null };
 
   let periodo = { clientes: "tudo", geral: "tudo" };
   let clienteDetalheId = null;
@@ -589,9 +610,28 @@
   const fmtUSD = (v) => v.toLocaleString("pt-BR", { style: "currency", currency: "USD" });
   const fmtData = (iso) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
 
-  const persistClientes = () => localStorage.setItem(CLIENTES_KEY, JSON.stringify(clientes));
-  const persistLancamentos = () => localStorage.setItem(LANCAMENTOS_KEY, JSON.stringify(lancamentos));
-  const persistCotacao = () => localStorage.setItem(COTACAO_KEY, JSON.stringify(cotacao));
+  // ---------- mapeamento com as tabelas do Supabase ----------
+  const clienteFromRow = (r) => ({ id: r.id, nome: r.nome, foto: r.foto || "", corIndex: r.cor_index });
+  const clienteToRow = (c) => ({ id: c.id, nome: c.nome, foto: c.foto || "", cor_index: c.corIndex });
+  const lancamentoFromRow = (r) => ({ id: r.id, clienteId: r.cliente_id, valor: Number(r.valor), moeda: r.moeda, data: r.data });
+  const lancamentoToRow = (l) => ({ id: l.id, cliente_id: l.clienteId, valor: l.valor, moeda: l.moeda, data: l.data });
+
+  async function carregarDados() {
+    const [{ data: clientesRows, error: erroClientes }, { data: lancamentosRows, error: erroLancamentos }, { data: cotacaoRows, error: erroCotacao }] =
+      await Promise.all([
+        db.from("clientes").select("*").order("criado_em", { ascending: true }),
+        db.from("lancamentos").select("*").order("data", { ascending: true }),
+        db.from("cotacao").select("*").eq("id", 1).maybeSingle(),
+      ]);
+    if (erroClientes || erroLancamentos || erroCotacao) {
+      alert("Não foi possível carregar os dados do Supabase. Veja o console para detalhes.");
+      console.error(erroClientes || erroLancamentos || erroCotacao);
+      return;
+    }
+    clientes = (clientesRows || []).map(clienteFromRow);
+    lancamentos = (lancamentosRows || []).map(lancamentoFromRow);
+    if (cotacaoRows) cotacao = { valor: Number(cotacaoRows.valor), atualizadoEm: cotacaoRows.atualizado_em };
+  }
 
   const valorBRL = (l) => l.moeda === "BRL" ? l.valor : l.valor * cotacao.valor;
   const valorUSD = (l) => l.moeda === "USD" ? l.valor : l.valor / cotacao.valor;
@@ -635,6 +675,11 @@
     }
   }
 
+  async function salvarCotacao() {
+    const { error } = await db.from("cotacao").update({ valor: cotacao.valor, atualizado_em: cotacao.atualizadoEm }).eq("id", 1);
+    if (error) { alert("Não foi possível salvar a cotação."); console.error(error); }
+  }
+
   async function buscarCotacao() {
     const btn = document.getElementById("btn-refresh-cotacao");
     btn.classList.add("girando");
@@ -644,7 +689,7 @@
       const bid = parseFloat(data.USDBRL.bid);
       if (!isNaN(bid) && bid > 0) {
         cotacao = { valor: bid, atualizadoEm: new Date().toISOString() };
-        persistCotacao();
+        await salvarCotacao();
       }
     } catch (err) {
       // sem internet ou API fora do ar: mantém a cotação salva
@@ -655,11 +700,11 @@
   }
 
   document.getElementById("btn-refresh-cotacao").addEventListener("click", buscarCotacao);
-  inputCotacao.addEventListener("change", () => {
+  inputCotacao.addEventListener("change", async () => {
     const v = parseFloat(inputCotacao.value);
     if (!isNaN(v) && v > 0) {
       cotacao = { valor: v, atualizadoEm: cotacao.atualizadoEm };
-      persistCotacao();
+      await salvarCotacao();
       render();
     }
   });
@@ -1014,13 +1059,15 @@
   inputNomeCliente.addEventListener("input", atualizarPreviewAvatar);
   inputFotoCliente.addEventListener("input", atualizarPreviewAvatar);
 
-  document.getElementById("form-novo-cliente").addEventListener("submit", (e) => {
+  document.getElementById("form-novo-cliente").addEventListener("submit", async (e) => {
     e.preventDefault();
     const nome = inputNomeCliente.value.trim();
     const foto = inputFotoCliente.value.trim();
     if (!nome) return;
-    clientes.push({ id: uid(), nome, foto, corIndex: clientes.length % SLOTS.length });
-    persistClientes();
+    const cliente = { id: uid(), nome, foto, corIndex: clientes.length % SLOTS.length };
+    const { error } = await db.from("clientes").insert(clienteToRow(cliente));
+    if (error) { alert("Não foi possível salvar o cliente."); console.error(error); return; }
+    clientes.push(cliente);
     overlayNovoCliente.classList.remove("aberto");
     render();
   });
@@ -1092,42 +1139,45 @@
     }
   }
 
-  document.getElementById("form-novo-lancamento").addEventListener("submit", (e) => {
+  document.getElementById("form-novo-lancamento").addEventListener("submit", async (e) => {
     e.preventDefault();
     const valor = parseFloat(document.getElementById("input-valor-lancamento").value);
     const data = document.getElementById("input-data-lancamento").value;
     if (isNaN(valor) || valor <= 0 || !data || !clienteDetalheId) return;
-    lancamentos.push({ id: uid(), clienteId: clienteDetalheId, valor, moeda: moedaLancamento, data });
-    persistLancamentos();
+    const lancamento = { id: uid(), clienteId: clienteDetalheId, valor, moeda: moedaLancamento, data };
+    const { error } = await db.from("lancamentos").insert(lancamentoToRow(lancamento));
+    if (error) { alert("Não foi possível salvar o lançamento."); console.error(error); return; }
+    lancamentos.push(lancamento);
     document.getElementById("input-valor-lancamento").value = "";
     document.getElementById("input-data-lancamento").value = hojeISO();
     atualizarConversaoPreview();
     render();
   });
 
-  document.getElementById("detalhe-lancamentos-corpo").addEventListener("click", (e) => {
+  document.getElementById("detalhe-lancamentos-corpo").addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-del-lancamento]");
     if (!btn) return;
+    const { error } = await db.from("lancamentos").delete().eq("id", btn.dataset.delLancamento);
+    if (error) { alert("Não foi possível excluir o lançamento."); console.error(error); return; }
     lancamentos = lancamentos.filter((l) => l.id !== btn.dataset.delLancamento);
-    persistLancamentos();
     render();
   });
 
-  document.getElementById("btn-excluir-cliente").addEventListener("click", () => {
+  document.getElementById("btn-excluir-cliente").addEventListener("click", async () => {
     const cliente = clientes.find((c) => c.id === clienteDetalheId);
     if (!cliente) return;
     if (!confirm(`Excluir "${cliente.nome}" e todos os seus lançamentos? Essa ação não pode ser desfeita.`)) return;
+    const { error } = await db.from("clientes").delete().eq("id", clienteDetalheId);
+    if (error) { alert("Não foi possível excluir o cliente."); console.error(error); return; }
     clientes = clientes.filter((c) => c.id !== clienteDetalheId);
     lancamentos = lancamentos.filter((l) => l.clienteId !== clienteDetalheId);
-    persistClientes();
-    persistLancamentos();
     overlayDetalhe.classList.remove("aberto");
     clienteDetalheId = null;
     render();
   });
 
-  // ---------- fechar modais ----------
-  document.querySelectorAll(".overlay").forEach((overlay) => {
+  // ---------- fechar modais (exceto o gate de senha, que só fecha com senha certa) ----------
+  document.querySelectorAll(".overlay:not(#overlay-senha)").forEach((overlay) => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) fecharOverlay(overlay); });
     overlay.querySelectorAll("[data-close]").forEach((btn) => btn.addEventListener("click", () => fecharOverlay(overlay)));
   });
@@ -1136,41 +1186,41 @@
     if (overlay === overlayDetalhe) clienteDetalheId = null;
   }
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") document.querySelectorAll(".overlay.aberto").forEach(fecharOverlay);
+    if (e.key === "Escape") document.querySelectorAll(".overlay.aberto:not(#overlay-senha)").forEach(fecharOverlay);
   });
 
-  // ---------- dados fictícios para teste (remover quando pedido) ----------
-  const SEED_FLAG = "glp-seed-fake-v1";
-  function seedDadosFicticios() {
-    if (localStorage.getItem(SEED_FLAG)) return;
-    clientes = clientes.concat([
-      { id: "seed-cliente-usd-1", nome: "Jordan Blake", foto: "", corIndex: 0 },
-      { id: "seed-cliente-brl-1", nome: "Fernanda Oliveira", foto: "", corIndex: 2 },
-    ]);
-    lancamentos = lancamentos.concat([
-      { id: "seed-l-1", clienteId: "seed-cliente-usd-1", valor: 900, moeda: "USD", data: "2026-06-05" },
-      { id: "seed-l-2", clienteId: "seed-cliente-usd-1", valor: 750, moeda: "USD", data: "2026-06-20" },
-      { id: "seed-l-3", clienteId: "seed-cliente-usd-1", valor: 1100, moeda: "USD", data: "2026-07-03" },
-      { id: "seed-l-4", clienteId: "seed-cliente-usd-1", valor: 850, moeda: "USD", data: "2026-07-18" },
-      { id: "seed-l-5", clienteId: "seed-cliente-usd-1", valor: 700, moeda: "USD", data: "2026-08-02" },
-      { id: "seed-l-6", clienteId: "seed-cliente-usd-1", valor: 600, moeda: "USD", data: "2026-08-12" },
-      { id: "seed-l-7", clienteId: "seed-cliente-brl-1", valor: 4200, moeda: "BRL", data: "2026-06-10" },
-      { id: "seed-l-8", clienteId: "seed-cliente-brl-1", valor: 3800, moeda: "BRL", data: "2026-06-25" },
-      { id: "seed-l-9", clienteId: "seed-cliente-brl-1", valor: 4500, moeda: "BRL", data: "2026-07-08" },
-      { id: "seed-l-10", clienteId: "seed-cliente-brl-1", valor: 4000, moeda: "BRL", data: "2026-07-22" },
-      { id: "seed-l-11", clienteId: "seed-cliente-brl-1", valor: 4300, moeda: "BRL", data: "2026-08-05" },
-      { id: "seed-l-12", clienteId: "seed-cliente-brl-1", valor: 3900, moeda: "BRL", data: "2026-08-13" },
-    ]);
-    persistClientes();
-    persistLancamentos();
-    localStorage.setItem(SEED_FLAG, "1");
+  // ---------- inicialização ----------
+  async function iniciarApp() {
+    renderCotacaoBadge();
+    await carregarDados();
+    renderCotacaoBadge();
+    render();
+    buscarCotacao();
   }
 
-  // ---------- inicialização ----------
-  seedDadosFicticios();
-  renderCotacaoBadge();
-  render();
-  buscarCotacao();
+  const overlaySenha = document.getElementById("overlay-senha");
+  document.getElementById("form-senha").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("input-senha");
+    if (input.value === SENHA_ACESSO) {
+      sessionStorage.setItem(UNLOCK_KEY, "1");
+      overlaySenha.classList.remove("aberto");
+      overlaySenha.style.display = "none";
+      iniciarApp();
+    } else {
+      document.getElementById("senha-erro").style.display = "block";
+      input.value = "";
+      input.focus();
+    }
+  });
+
+  if (sessionStorage.getItem(UNLOCK_KEY) === "1") {
+    overlaySenha.classList.remove("aberto");
+    overlaySenha.style.display = "none";
+    iniciarApp();
+  } else {
+    document.getElementById("input-senha").focus();
+  }
 })();
 </script>
 
