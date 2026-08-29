@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Meus Lucros</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light;
@@ -225,7 +228,7 @@
   }
 
   .cliente-nome { font-weight: 650; font-size: 0.92rem; }
-  .cliente-total { font-size: 0.98rem; font-weight: 650; }
+  .cliente-total { font-size: 0.98rem; font-weight: 900; font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif; }
   .cliente-sub { font-size: 0.72rem; color: var(--text-muted); }
 
   /* stats */
@@ -241,7 +244,7 @@
     padding: 16px 18px;
   }
   .stat-tile .label { font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 6px; }
-  .stat-tile .value { font-size: 1.4rem; font-weight: 650; }
+  .stat-tile .value { font-size: 1.4rem; font-weight: 900; font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif; }
   .stat-tile .sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; }
 
   /* tabelas */
@@ -253,7 +256,7 @@
   .linha-cliente { display: flex; align-items: center; gap: 10px; }
   .linha-cliente .avatar { width: 30px; height: 30px; }
   .linha-cliente .avatar-fallback { font-size: 0.72rem; }
-  .valor-cell { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .valor-cell { font-variant-numeric: tabular-nums; font-weight: 900; white-space: nowrap; font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif; }
   .del-btn { border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 4px 6px; border-radius: 6px; }
   .del-btn:hover { color: var(--critical-text); background: var(--gridline); }
   .tag { display: inline-block; font-size: 0.7rem; color: var(--text-secondary); background: var(--page-bg); border: 1px solid var(--border); padding: 1px 7px; border-radius: 999px; }
@@ -334,7 +337,7 @@
   .preview-avatar { display: flex; align-items: center; gap: 10px; margin-top: -2px; }
   .preview-avatar .avatar { width: 44px; height: 44px; }
 
-  #detalhe-cliente-total { font-size: 1.6rem; font-weight: 650; }
+  #detalhe-cliente-total { font-size: 1.6rem; font-weight: 900; font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif; }
   .detalhe-header { display: flex; align-items: center; gap: 14px; }
   .detalhe-header .info { flex: 1; }
   .detalhe-header .nome { font-size: 1.1rem; font-weight: 650; }
@@ -364,10 +367,10 @@
     main { padding: 16px 16px 96px; }
     .card { padding: 14px; }
     .section-title { margin: 20px 0 10px; font-size: 0.88rem; }
-    .clientes-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .clientes-grid { grid-template-columns: 1fr; gap: 10px; }
     .cliente-card { padding: 12px; }
     .avatar { width: 46px; height: 46px; }
-    .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stats { grid-template-columns: 1fr; gap: 10px; }
     .stat-tile { padding: 12px 14px; }
     .stat-tile .value { font-size: 1.2rem; }
     .modal { padding: 16px; border-radius: 12px; max-height: 92vh; }
@@ -542,7 +545,7 @@
         <button type="button" data-moeda="USD">Dólar (US$)</button>
       </div>
       <label>Valor
-        <input type="number" id="input-valor-lancamento" min="0" step="0.01" placeholder="0,00" required>
+        <input type="text" inputmode="decimal" id="input-valor-lancamento" placeholder="R$ 0,00" required>
       </label>
       <div class="conversao-preview" id="conversao-preview"></div>
       <button type="submit" class="btn-primary">Adicionar lançamento</button>
@@ -1057,9 +1060,26 @@
     moedaLancamento = "BRL";
     document.querySelectorAll("#moeda-toggle button").forEach((b) => b.classList.toggle("active", b.dataset.moeda === "BRL"));
     document.getElementById("input-valor-lancamento").value = "";
+    document.getElementById("input-valor-lancamento").placeholder = "R$ 0,00";
     popularSelectClientes();
     atualizarConversaoPreview();
     overlayNovoLancamento.classList.add("aberto");
+  }
+
+  // ---------- máscara de moeda (R$ / US$) no campo de valor ----------
+  function valorNumericoLancamento() {
+    const digitos = (document.getElementById("input-valor-lancamento").value.match(/\d/g) || []).join("");
+    return digitos ? parseInt(digitos, 10) / 100 : NaN;
+  }
+
+  function aplicarMascaraValor() {
+    const el = document.getElementById("input-valor-lancamento");
+    const digitos = (el.value.match(/\d/g) || []).join("").replace(/^0+(?=\d)/, "");
+    const prefixo = moedaLancamento === "USD" ? "US$ " : "R$ ";
+    el.placeholder = `${prefixo}0,00`;
+    if (!digitos) { el.value = ""; return; }
+    const numero = parseInt(digitos, 10) / 100;
+    el.value = prefixo + numero.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   document.getElementById("btn-add-lancamento").addEventListener("click", abrirNovoLancamento);
@@ -1111,12 +1131,16 @@
     if (!btn) return;
     moedaLancamento = btn.dataset.moeda;
     document.querySelectorAll("#moeda-toggle button").forEach((b) => b.classList.toggle("active", b === btn));
+    aplicarMascaraValor();
     atualizarConversaoPreview();
   });
-  document.getElementById("input-valor-lancamento").addEventListener("input", atualizarConversaoPreview);
+  document.getElementById("input-valor-lancamento").addEventListener("input", () => {
+    aplicarMascaraValor();
+    atualizarConversaoPreview();
+  });
 
   function atualizarConversaoPreview() {
-    const valor = parseFloat(document.getElementById("input-valor-lancamento").value);
+    const valor = valorNumericoLancamento();
     const el = document.getElementById("conversao-preview");
     if (isNaN(valor) || valor <= 0) { el.textContent = ""; return; }
     if (moedaLancamento === "BRL") {
@@ -1128,7 +1152,7 @@
 
   document.getElementById("form-novo-lancamento").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const valor = parseFloat(document.getElementById("input-valor-lancamento").value);
+    const valor = valorNumericoLancamento();
     const clienteId = document.getElementById("select-cliente-lancamento").value;
     if (isNaN(valor) || valor <= 0 || !clienteId) return;
     const lancamento = { id: uid(), clienteId, valor, moeda: moedaLancamento, data: hojeISO() };
