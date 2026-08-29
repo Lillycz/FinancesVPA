@@ -435,7 +435,10 @@
       </div>
     </div>
 
-    <div class="section-title">Clientes</div>
+    <div class="section-title" style="display:flex; align-items:center; gap:8px;">
+      Clientes
+      <span id="clientes-contador" style="font-size:0.72rem; font-weight:600; color:var(--text-muted); background:var(--glass-bg-2); border:1px solid var(--glass-border); padding:2px 9px; border-radius:999px;">0</span>
+    </div>
     <div class="clientes-grid" id="clientes-grid"></div>
   </section>
 
@@ -778,6 +781,7 @@
   function renderClientesGrid() {
     const lista = lancamentosNoPeriodo("clientes", lancamentos);
     const grid = document.getElementById("clientes-grid");
+    document.getElementById("clientes-contador").textContent = clientes.length;
 
     const cards = clientes.map((c) => {
       const doCliente = lista.filter((l) => l.clienteId === c.id);
