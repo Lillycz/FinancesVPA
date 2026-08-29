@@ -312,8 +312,16 @@
 
   /* pontinhos da senha */
   .pin-dots { display: flex; justify-content: center; gap: 14px; margin: 18px 0 0; }
-  .pin-dot { width: 14px; height: 14px; border-radius: 999px; border: 2px solid var(--baseline); transition: background 0.1s ease, border-color 0.1s ease; }
-  .pin-dot.preenchido { background: var(--text-primary); border-color: var(--text-primary); }
+  .pin-dot { width: 14px; height: 14px; border-radius: 999px; border: 2px solid var(--baseline); transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease; }
+  .pin-dot.preenchido { background: var(--text-primary); border-color: var(--text-primary); transform: scale(1.2); }
+  .pin-dot.erro { background: var(--critical-text); border-color: var(--critical-text); }
+  @keyframes tremer-senha {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(4px); }
+    30%, 50%, 70% { transform: translateX(-7px); }
+    40%, 60% { transform: translateX(7px); }
+  }
+  .pin-dots.tremendo { animation: tremer-senha 0.4s ease; }
 
   /* teclado numérico (senha e valor do lançamento) */
   .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
@@ -328,8 +336,9 @@
     font-weight: 650;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    transition: transform 0.08s ease, filter 0.08s ease;
   }
-  .keypad button:active { background: var(--glass-bg); }
+  .keypad button:active { transform: scale(0.9); filter: brightness(0.82); }
   .keypad button.keypad-vazio { visibility: hidden; cursor: default; }
   .keypad button.keypad-del { font-size: 1.05rem; color: var(--text-secondary); }
 
@@ -1442,6 +1451,16 @@
     senhaDigitada = "";
     renderPinDots();
     document.getElementById("senha-erro").style.visibility = "hidden";
+    document.getElementById("pin-dots").classList.remove("tremendo");
+    document.querySelectorAll("#pin-dots .pin-dot").forEach((dot) => dot.classList.remove("erro"));
+  }
+
+  function mostrarSenhaErrada() {
+    document.getElementById("senha-erro").style.visibility = "visible";
+    const dots = document.getElementById("pin-dots");
+    dots.classList.add("tremendo");
+    document.querySelectorAll("#pin-dots .pin-dot").forEach((dot) => dot.classList.add("erro"));
+    setTimeout(resetSenha, 500);
   }
 
   function desbloquearApp() {
@@ -1466,8 +1485,7 @@
       if (senhaDigitada === SENHA_ACESSO) {
         desbloquearApp();
       } else {
-        document.getElementById("senha-erro").style.visibility = "visible";
-        setTimeout(resetSenha, 450);
+        mostrarSenhaErrada();
       }
     }
   });
