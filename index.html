@@ -93,45 +93,6 @@
   header h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 650; }
   header p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; }
 
-  .cotacao-badge {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), var(--glass-hi);
-    border-radius: 999px;
-    padding: 8px 8px 8px 14px;
-    font-size: 0.82rem;
-  }
-  .cotacao-badge .rotulo { color: var(--text-muted); }
-  .cotacao-badge input {
-    width: 56px;
-    border: none;
-    background: transparent;
-    color: var(--text-primary);
-    font: inherit;
-    font-weight: 650;
-    text-align: right;
-  }
-  .cotacao-badge input:focus { outline: none; }
-  .cotacao-badge .atualizado { color: var(--text-muted); font-size: 0.72rem; }
-  .icon-btn {
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg-2);
-    color: var(--text-secondary);
-    width: 26px; height: 26px;
-    border-radius: 999px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-  }
-  .icon-btn:hover { color: var(--text-primary); }
-  .icon-btn.girando { animation: girar 0.8s linear infinite; }
-  @keyframes girar { to { transform: rotate(360deg); } }
 
   /* tabs: segmented pill de vidro, no estilo iOS */
   .tabs { max-width: 1120px; margin: 22px auto 0; padding: 0 24px; }
@@ -369,8 +330,6 @@
     header { padding: 18px 16px 0; gap: 10px; }
     header h1 { font-size: 1.25rem; }
     header p { font-size: 0.82rem; }
-    .cotacao-badge { font-size: 0.76rem; padding: 6px 6px 6px 12px; }
-    .cotacao-badge .atualizado { display: none; }
     .tabs { padding: 0 16px; margin-top: 16px; }
     .tab-btn { padding: 7px 14px; font-size: 0.84rem; }
     main { padding: 16px 16px 48px; }
@@ -399,12 +358,6 @@
       <h1>Meus Lucros</h1>
       <p>Lucro por cliente, em real e dólar.</p>
     </div>
-  </div>
-  <div class="cotacao-badge">
-    <span class="rotulo">1 USD =</span>
-    R$ <input type="number" id="input-cotacao" min="0" step="0.0001">
-    <button class="icon-btn" id="btn-refresh-cotacao" title="Atualizar cotação">⟳</button>
-    <span class="atualizado" id="cotacao-atualizado"></span>
   </div>
 </header>
 
@@ -664,28 +617,13 @@
     </div>`;
   }
 
-  // ---------- cotação ----------
-  const inputCotacao = document.getElementById("input-cotacao");
-  const cotacaoAtualizadoEl = document.getElementById("cotacao-atualizado");
-
-  function renderCotacaoBadge() {
-    inputCotacao.value = cotacao.valor.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
-    if (cotacao.atualizadoEm) {
-      const d = new Date(cotacao.atualizadoEm);
-      cotacaoAtualizadoEl.textContent = `atualizado ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
-    } else {
-      cotacaoAtualizadoEl.textContent = "não atualizado ainda";
-    }
-  }
-
+  // ---------- cotação (buscada e salva em segundo plano, sem UI própria) ----------
   async function salvarCotacao() {
     const { error } = await db.from("cotacao").update({ valor: cotacao.valor, atualizado_em: cotacao.atualizadoEm }).eq("id", 1);
     if (error) { alert("Não foi possível salvar a cotação."); console.error(error); }
   }
 
   async function buscarCotacao() {
-    const btn = document.getElementById("btn-refresh-cotacao");
-    btn.classList.add("girando");
     try {
       const res = await fetch("https://economia.awesomeapi.com.br/last/USD-BRL");
       const data = await res.json();
@@ -697,20 +635,8 @@
     } catch (err) {
       // sem internet ou API fora do ar: mantém a cotação salva
     }
-    btn.classList.remove("girando");
-    renderCotacaoBadge();
     render();
   }
-
-  document.getElementById("btn-refresh-cotacao").addEventListener("click", buscarCotacao);
-  inputCotacao.addEventListener("change", async () => {
-    const v = parseFloat(inputCotacao.value);
-    if (!isNaN(v) && v > 0) {
-      cotacao = { valor: v, atualizadoEm: cotacao.atualizadoEm };
-      await salvarCotacao();
-      render();
-    }
-  });
 
   // ---------- abas ----------
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -1195,9 +1121,7 @@
 
   // ---------- inicialização ----------
   async function iniciarApp() {
-    renderCotacaoBadge();
     await carregarDados();
-    renderCotacaoBadge();
     render();
     buscarCotacao();
   }
