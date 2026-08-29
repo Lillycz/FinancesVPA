@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Meus Lucros</title>
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0b0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meus Lucros">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap" rel="stylesheet">
@@ -220,6 +229,7 @@
   }
   .avatar.grande { width: 72px; height: 72px; }
   .avatar img { width: 100%; height: 100%; border-radius: 999px; object-fit: cover; display: block; }
+  .avatar-btn { border: none; padding: 0; background: none; font: inherit; cursor: pointer; }
   .avatar-fallback {
     position: absolute; inset: 0;
     border-radius: 999px;
@@ -464,9 +474,9 @@
 
 <header>
   <div style="display:flex; align-items:center; gap:14px;">
-    <div class="avatar" style="width:52px; height:52px; --accent: var(--slot-1);">
+    <button type="button" class="avatar avatar-btn" id="btn-abrir-config" style="width:52px; height:52px; --accent: var(--slot-1);" title="Configurações">
       <img src="https://i.imgur.com/Gyhv1n8.png" alt="Minha foto">
-    </div>
+    </button>
     <div>
       <h1>Meus Lucros</h1>
       <p>Lucro por cliente, em real e dólar.</p>
@@ -574,6 +584,18 @@
     </div>
   </section>
 </main>
+
+<!-- MODAL: configurações (só desktop) -->
+<div class="overlay" id="overlay-config">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header">
+      <h2 style="margin:0; font-size:1.05rem;">Configurações</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <button type="button" class="btn-primary" id="btn-baixar-app">Baixar aplicativo</button>
+    <div id="baixar-app-info" style="display:none; font-size:0.78rem; color:var(--text-muted); margin-top:10px;"></div>
+  </div>
+</div>
 
 <!-- GATE DE SENHA -->
 <div class="overlay aberto" id="overlay-senha" style="z-index:999; background:var(--page-bg);">
@@ -1429,6 +1451,36 @@
   }
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") document.querySelectorAll(".overlay.aberto:not(#overlay-senha)").forEach(fecharOverlay);
+  });
+
+  // ---------- configurações / instalar app (só desktop) ----------
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+
+  let promptInstalacao = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    promptInstalacao = e;
+  });
+
+  document.getElementById("btn-abrir-config").addEventListener("click", () => {
+    if (!window.matchMedia("(min-width: 641px)").matches) return;
+    document.getElementById("baixar-app-info").style.display = "none";
+    document.getElementById("overlay-config").classList.add("aberto");
+  });
+
+  document.getElementById("btn-baixar-app").addEventListener("click", async () => {
+    const info = document.getElementById("baixar-app-info");
+    info.style.display = "block";
+    if (promptInstalacao) {
+      promptInstalacao.prompt();
+      const resultado = await promptInstalacao.userChoice;
+      promptInstalacao = null;
+      info.textContent = resultado.outcome === "accepted" ? "Aplicativo instalado!" : "Instalação cancelada.";
+    } else {
+      info.textContent = "Se o botão de instalar não abriu, procure o ícone de instalar app na barra de endereço do navegador (ou já está instalado).";
+    }
   });
 
   // ---------- inicialização ----------
