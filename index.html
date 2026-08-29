@@ -245,8 +245,8 @@
   .stat-tile .sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; }
 
   /* tabelas */
-  .table-scroll { width: 100%; overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  .table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 0.86rem; }
   thead th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--gridline); }
   tbody td { padding: 10px; border-bottom: 1px solid var(--gridline); vertical-align: middle; }
   tbody tr:last-child td { border-bottom: none; }
@@ -351,6 +351,7 @@
       z-index: 40;
       box-shadow: var(--glass-shadow), var(--glass-hi), 0 6px 18px rgba(0,0,0,0.28);
     }
+    main { padding-bottom: 96px; }
   }
 
   /* responsivo: telas pequenas / celular */
@@ -360,7 +361,7 @@
     header p { font-size: 0.82rem; }
     .tabs { padding: 0 16px; margin-top: 16px; }
     .tab-btn { padding: 7px 14px; font-size: 0.84rem; }
-    main { padding: 16px 16px 48px; }
+    main { padding: 16px 16px 96px; }
     .card { padding: 14px; }
     .section-title { margin: 20px 0 10px; font-size: 0.88rem; }
     .clientes-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
@@ -940,7 +941,11 @@
     const groupW = areaW / dados.length;
     const barW = Math.min(32, groupW * 0.45);
     const maxIdx = dados.reduce((best, d, i) => d.total > dados[best].total ? i : best, 0);
-    const labelStep = dados.length > 15 ? Math.max(1, Math.ceil(dados.length / 10)) : 1;
+    const minPxPorRotulo = compacto ? 32 : 40;
+    const labelStep = groupW >= minPxPorRotulo ? 1 : Math.max(1, Math.ceil(minPxPorRotulo / groupW));
+    // só força mostrar o último rótulo se sobrar espaço suficiente perto do anterior — senão ele "gruda" no vizinho
+    const ultimoIndiceComStep = Math.floor((dados.length - 1) / labelStep) * labelStep;
+    const forcarUltimoRotulo = (dados.length - 1 - ultimoIndiceComStep) * groupW >= minPxPorRotulo;
 
     const ticks = 4;
     for (let i = 0; i <= ticks; i++) {
@@ -974,7 +979,7 @@
         root.appendChild(val);
       }
 
-      if (i % labelStep === 0 || i === dados.length - 1) {
+      if (i % labelStep === 0 || (i === dados.length - 1 && forcarUltimoRotulo)) {
         const label = el("text", { x: cx, y: plotH + 18, "text-anchor": "middle", fill: "var(--text-muted)", "font-size": tickFont });
         label.textContent = d.label;
         root.appendChild(label);
