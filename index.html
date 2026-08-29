@@ -93,6 +93,25 @@
   header h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 650; }
   header p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; }
 
+  .fab-add {
+    flex-shrink: 0;
+    width: 44px; height: 44px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    box-shadow: var(--glass-shadow), var(--glass-hi);
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .fab-add:hover { transform: translateY(-1px); }
+
 
   /* tabs: segmented pill de vidro, no estilo iOS */
   .tabs { max-width: 1120px; margin: 22px auto 0; padding: 0 24px; }
@@ -323,6 +342,15 @@
   /* responsivo: telas médias (tablet) */
   @media (max-width: 640px) {
     .filtros .custom-range { flex-basis: 100%; margin-left: 0; }
+    .fab-add {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 56px; height: 56px;
+      font-size: 1.9rem;
+      z-index: 40;
+      box-shadow: var(--glass-shadow), var(--glass-hi), 0 6px 18px rgba(0,0,0,0.28);
+    }
   }
 
   /* responsivo: telas pequenas / celular */
@@ -359,6 +387,7 @@
       <p>Lucro por cliente, em real e dólar.</p>
     </div>
   </div>
+  <button class="fab-add" id="btn-add-lancamento" title="Adicionar lançamento" aria-label="Adicionar lançamento">+</button>
 </header>
 
 <div class="tabs">
@@ -496,6 +525,30 @@
   </div>
 </div>
 
+<!-- MODAL: novo lançamento (global) -->
+<div class="overlay" id="overlay-novo-lancamento">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h2 style="margin:0; font-size:1.05rem;">Novo lançamento</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <form id="form-novo-lancamento">
+      <label>Cliente
+        <select id="select-cliente-lancamento" required></select>
+      </label>
+      <div class="moeda-toggle" id="moeda-toggle">
+        <button type="button" data-moeda="BRL" class="active">Real (R$)</button>
+        <button type="button" data-moeda="USD">Dólar (US$)</button>
+      </div>
+      <label>Valor
+        <input type="number" id="input-valor-lancamento" min="0" step="0.01" placeholder="0,00" required>
+      </label>
+      <div class="conversao-preview" id="conversao-preview"></div>
+      <button type="submit" class="btn-primary">Adicionar lançamento</button>
+    </form>
+  </div>
+</div>
+
 <!-- MODAL: detalhe do cliente -->
 <div class="overlay" id="overlay-detalhe-cliente">
   <div class="modal" style="max-width:520px;">
@@ -511,23 +564,7 @@
       <button class="modal-close" data-close>✕</button>
     </div>
 
-    <div class="section-title" style="margin-top:0;">Novo lançamento</div>
-    <form id="form-novo-lancamento">
-      <div class="moeda-toggle" id="moeda-toggle">
-        <button type="button" data-moeda="BRL" class="active">Real (R$)</button>
-        <button type="button" data-moeda="USD">Dólar (US$)</button>
-      </div>
-      <label>Valor
-        <input type="number" id="input-valor-lancamento" min="0" step="0.01" placeholder="0,00" required>
-      </label>
-      <div class="conversao-preview" id="conversao-preview"></div>
-      <label>Data
-        <input type="date" id="input-data-lancamento" required>
-      </label>
-      <button type="submit" class="btn-primary">Adicionar lançamento</button>
-    </form>
-
-    <div class="section-title">Lançamentos do período</div>
+    <div class="section-title" style="margin-top:0;">Lançamentos do período</div>
     <div class="table-scroll">
       <table>
         <thead><tr><th>Data</th><th style="text-align:right;">Valor</th><th style="text-align:right;">Em BRL</th><th></th></tr></thead>
@@ -1002,16 +1039,31 @@
     render();
   });
 
+  // ---------- modal: novo lançamento (global) ----------
+  const overlayNovoLancamento = document.getElementById("overlay-novo-lancamento");
+
+  function popularSelectClientes() {
+    const select = document.getElementById("select-cliente-lancamento");
+    select.innerHTML = clientes.map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join("");
+  }
+
+  function abrirNovoLancamento() {
+    if (clientes.length === 0) { alert("Cadastre um cliente antes de adicionar um lançamento."); return; }
+    moedaLancamento = "BRL";
+    document.querySelectorAll("#moeda-toggle button").forEach((b) => b.classList.toggle("active", b.dataset.moeda === "BRL"));
+    document.getElementById("input-valor-lancamento").value = "";
+    popularSelectClientes();
+    atualizarConversaoPreview();
+    overlayNovoLancamento.classList.add("aberto");
+  }
+
+  document.getElementById("btn-add-lancamento").addEventListener("click", abrirNovoLancamento);
+
   // ---------- modal: detalhe do cliente ----------
   const overlayDetalhe = document.getElementById("overlay-detalhe-cliente");
 
   function abrirDetalheCliente(id) {
     clienteDetalheId = id;
-    moedaLancamento = "BRL";
-    document.querySelectorAll("#moeda-toggle button").forEach((b) => b.classList.toggle("active", b.dataset.moeda === "BRL"));
-    document.getElementById("input-data-lancamento").value = hojeISO();
-    document.getElementById("input-valor-lancamento").value = "";
-    atualizarConversaoPreview();
     renderDetalheCliente();
     overlayDetalhe.classList.add("aberto");
   }
@@ -1072,15 +1124,13 @@
   document.getElementById("form-novo-lancamento").addEventListener("submit", async (e) => {
     e.preventDefault();
     const valor = parseFloat(document.getElementById("input-valor-lancamento").value);
-    const data = document.getElementById("input-data-lancamento").value;
-    if (isNaN(valor) || valor <= 0 || !data || !clienteDetalheId) return;
-    const lancamento = { id: uid(), clienteId: clienteDetalheId, valor, moeda: moedaLancamento, data };
+    const clienteId = document.getElementById("select-cliente-lancamento").value;
+    if (isNaN(valor) || valor <= 0 || !clienteId) return;
+    const lancamento = { id: uid(), clienteId, valor, moeda: moedaLancamento, data: hojeISO() };
     const { error } = await db.from("lancamentos").insert(lancamentoToRow(lancamento));
     if (error) { alert("Não foi possível salvar o lançamento."); console.error(error); return; }
     lancamentos.push(lancamento);
-    document.getElementById("input-valor-lancamento").value = "";
-    document.getElementById("input-data-lancamento").value = hojeISO();
-    atualizarConversaoPreview();
+    overlayNovoLancamento.classList.remove("aberto");
     render();
   });
 
