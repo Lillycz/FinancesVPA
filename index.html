@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
 <style>
   :root {
     color-scheme: light;
@@ -360,8 +361,42 @@
   .btn-primary:hover { filter: brightness(1.06); }
   .btn-secundario { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--glass-border); background: var(--glass-bg-2); color: var(--critical-text); font: inherit; font-size: 0.82rem; cursor: pointer; }
 
-  .preview-avatar { display: flex; align-items: center; gap: 10px; margin-top: -2px; }
-  .preview-avatar .avatar { width: 44px; height: 44px; }
+  /* seletor de foto (novo cliente) */
+  .foto-picker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 12px;
+    border: 1.5px dashed var(--glass-border);
+    border-radius: 18px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .foto-picker:hover, .foto-picker:focus-visible { border-color: var(--series-lucro); outline: none; }
+  .foto-picker.arrastando { border-color: var(--series-lucro); background: var(--glass-bg-2); }
+  .avatar-picker { width: 76px; height: 76px; box-shadow: 0 0 0 2px var(--glass-border); }
+  .avatar-fallback-vazio { background: var(--glass-bg-2); color: var(--text-muted); font-size: 1.6rem; font-weight: 400; }
+  .foto-picker-texto { font-size: 0.78rem; color: var(--text-muted); text-align: center; }
+
+  /* editar foto do cliente já cadastrado */
+  .avatar-editavel { position: relative; flex-shrink: 0; }
+  .avatar-editar-btn {
+    position: absolute; bottom: -2px; right: -2px;
+    width: 26px; height: 26px;
+    border-radius: 999px;
+    border: 2px solid var(--surface-1);
+    background: var(--text-primary);
+    color: var(--page-bg);
+    font-size: 0.78rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* recorte de foto */
+  .cropper-viewport { width: 100%; height: 280px; background: #000; border-radius: 16px; overflow: hidden; }
+  .cropper-viewport img { max-width: 100%; display: block; }
+  .cropper-view-box, .cropper-face { border-radius: 50%; }
 
   #detalhe-cliente-total { font-size: 1.85rem; font-weight: 900; font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif; }
   .detalhe-header { display: flex; align-items: center; gap: 14px; }
@@ -570,15 +605,32 @@
       <label>Nome do cliente
         <input type="text" id="input-nome-cliente" placeholder="Ex: João Silva" required>
       </label>
-      <label>Link da foto (opcional)
-        <input type="url" id="input-foto-cliente" placeholder="https://...">
+      <label>Foto do cliente
+        <div class="foto-picker" id="foto-picker-novo" tabindex="0" role="button">
+          <div class="avatar avatar-picker" id="preview-avatar-wrap">
+            <div class="avatar-fallback avatar-fallback-vazio" id="preview-avatar-fallback">+</div>
+          </div>
+          <span class="foto-picker-texto">Clique ou arraste uma foto aqui</span>
+        </div>
+        <input type="file" accept="image/*" id="input-foto-arquivo" hidden>
       </label>
-      <div class="preview-avatar">
-        <div class="avatar" id="preview-avatar-wrap"><div class="avatar-fallback" id="preview-avatar-fallback">?</div></div>
-        <span style="font-size:0.78rem; color:var(--text-muted);">Pré-visualização</span>
-      </div>
       <button type="submit" class="btn-primary">Adicionar cliente</button>
     </form>
+  </div>
+</div>
+
+<!-- MODAL: ajustar foto -->
+<div class="overlay" id="overlay-recortar-foto" style="z-index:900;">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <h2 style="margin:0; font-size:1.05rem;">Ajustar foto</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="cropper-viewport">
+      <img id="imagem-recorte" alt="">
+    </div>
+    <input type="range" id="zoom-recorte" min="0" max="1" step="0.01" value="0" style="width:100%; margin-top:14px;">
+    <button type="button" class="btn-primary" id="btn-confirmar-recorte" style="margin-top:10px;">Usar esta foto</button>
   </div>
 </div>
 
@@ -625,7 +677,11 @@
   <div class="modal" style="max-width:520px;">
     <div class="modal-header">
       <div class="detalhe-header">
-        <div class="avatar grande" id="detalhe-avatar-wrap"></div>
+        <div class="avatar-editavel">
+          <div class="avatar grande" id="detalhe-avatar-wrap"></div>
+          <button type="button" class="avatar-editar-btn" id="btn-editar-foto" title="Alterar foto">✎</button>
+          <input type="file" accept="image/*" id="input-foto-editar" hidden>
+        </div>
         <div class="info">
           <div class="nome" id="detalhe-nome"></div>
           <div id="detalhe-cliente-total"></div>
@@ -649,6 +705,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script>
 (function () {
   const SUPABASE_URL = "https://ukwncfxgbrjqnaycvakr.supabase.co";
@@ -1079,39 +1136,126 @@
 
   // ---------- modal: novo cliente ----------
   const overlayNovoCliente = document.getElementById("overlay-novo-cliente");
-  const inputFotoCliente = document.getElementById("input-foto-cliente");
   const inputNomeCliente = document.getElementById("input-nome-cliente");
+  let fotoNovoClienteDataUrl = null;
 
   function abrirNovoCliente() {
     document.getElementById("form-novo-cliente").reset();
-    atualizarPreviewAvatar();
+    fotoNovoClienteDataUrl = null;
+    resetPreviewFotoNovo();
     overlayNovoCliente.classList.add("aberto");
     inputNomeCliente.focus();
   }
-  function atualizarPreviewAvatar() {
-    const nome = inputNomeCliente.value.trim() || "?";
-    const foto = inputFotoCliente.value.trim();
-    const wrap = document.getElementById("preview-avatar-wrap");
-    const cor = SLOTS[clientes.length % SLOTS.length];
-    wrap.style.setProperty("--accent", cor);
-    wrap.innerHTML = foto
-      ? `<img src="${escapeHtml(foto)}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="avatar-fallback" id="preview-avatar-fallback" style="display:none;">${escapeHtml(iniciais(nome))}</div>`
-      : `<div class="avatar-fallback" id="preview-avatar-fallback">${escapeHtml(iniciais(nome))}</div>`;
+  function resetPreviewFotoNovo() {
+    document.getElementById("preview-avatar-wrap").innerHTML = `<div class="avatar-fallback avatar-fallback-vazio" id="preview-avatar-fallback">+</div>`;
   }
-  inputNomeCliente.addEventListener("input", atualizarPreviewAvatar);
-  inputFotoCliente.addEventListener("input", atualizarPreviewAvatar);
 
   document.getElementById("form-novo-cliente").addEventListener("submit", async (e) => {
     e.preventDefault();
     const nome = inputNomeCliente.value.trim();
-    const foto = inputFotoCliente.value.trim();
     if (!nome) return;
-    const cliente = { id: uid(), nome, foto, corIndex: clientes.length % SLOTS.length };
+    if (!fotoNovoClienteDataUrl) { alert("Adicione uma foto do cliente."); return; }
+    const cliente = { id: uid(), nome, foto: fotoNovoClienteDataUrl, corIndex: clientes.length % SLOTS.length };
     const { error } = await db.from("clientes").insert(clienteToRow(cliente));
     if (error) { alert("Não foi possível salvar o cliente."); console.error(error); return; }
     clientes.push(cliente);
     overlayNovoCliente.classList.remove("aberto");
     render();
+  });
+
+  // ---------- escolha de arquivo (clique ou arrastar) ----------
+  const fotoPickerNovo = document.getElementById("foto-picker-novo");
+  const inputFotoArquivo = document.getElementById("input-foto-arquivo");
+
+  fotoPickerNovo.addEventListener("click", () => inputFotoArquivo.click());
+  fotoPickerNovo.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputFotoArquivo.click(); }
+  });
+  inputFotoArquivo.addEventListener("change", () => {
+    const file = inputFotoArquivo.files[0];
+    if (file) abrirRecorte(file, "novo");
+    inputFotoArquivo.value = "";
+  });
+  ["dragover", "dragleave", "drop"].forEach((evento) => {
+    fotoPickerNovo.addEventListener(evento, (e) => {
+      e.preventDefault();
+      fotoPickerNovo.classList.toggle("arrastando", evento === "dragover");
+      if (evento === "drop") {
+        const file = e.dataTransfer.files[0];
+        if (file) abrirRecorte(file, "novo");
+      }
+    });
+  });
+
+  // ---------- editar foto de um cliente já cadastrado ----------
+  document.getElementById("btn-editar-foto").addEventListener("click", () => {
+    document.getElementById("input-foto-editar").click();
+  });
+  document.getElementById("input-foto-editar").addEventListener("change", () => {
+    const input = document.getElementById("input-foto-editar");
+    const file = input.files[0];
+    if (file) abrirRecorte(file, "editar");
+    input.value = "";
+  });
+
+  // ---------- modal: recortar foto ----------
+  const overlayRecortarFoto = document.getElementById("overlay-recortar-foto");
+  const imagemRecorte = document.getElementById("imagem-recorte");
+  const zoomRecorte = document.getElementById("zoom-recorte");
+  let cropperInstance = null;
+  let contextoRecorte = null;
+  let zoomAnterior = 0;
+
+  function abrirRecorte(file, contexto) {
+    if (!file.type.startsWith("image/")) { alert("Escolha um arquivo de imagem."); return; }
+    contextoRecorte = contexto;
+    const reader = new FileReader();
+    reader.onload = () => {
+      imagemRecorte.src = reader.result;
+      overlayRecortarFoto.classList.add("aberto");
+      if (cropperInstance) cropperInstance.destroy();
+      zoomRecorte.value = 0;
+      zoomAnterior = 0;
+      cropperInstance = new Cropper(imagemRecorte, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: "move",
+        cropBoxMovable: false,
+        cropBoxResizable: false,
+        guides: false,
+        center: false,
+        highlight: false,
+        background: false,
+        autoCropArea: 1,
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  zoomRecorte.addEventListener("input", () => {
+    if (!cropperInstance) return;
+    const atual = Number(zoomRecorte.value);
+    cropperInstance.zoom(atual - zoomAnterior);
+    zoomAnterior = atual;
+  });
+
+  document.getElementById("btn-confirmar-recorte").addEventListener("click", async () => {
+    if (!cropperInstance) return;
+    const dataUrl = cropperInstance.getCroppedCanvas({ width: 320, height: 320 }).toDataURL("image/jpeg", 0.85);
+    if (contextoRecorte === "novo") {
+      fotoNovoClienteDataUrl = dataUrl;
+      document.getElementById("preview-avatar-wrap").innerHTML = `<img src="${dataUrl}" alt="">`;
+    } else if (contextoRecorte === "editar") {
+      const cliente = clientes.find((c) => c.id === clienteDetalheId);
+      if (cliente) {
+        const { error } = await db.from("clientes").update({ foto: dataUrl }).eq("id", cliente.id);
+        if (error) { alert("Não foi possível salvar a foto."); console.error(error); }
+        else { cliente.foto = dataUrl; render(); }
+      }
+    }
+    cropperInstance.destroy();
+    cropperInstance = null;
+    overlayRecortarFoto.classList.remove("aberto");
   });
 
   // ---------- modal: novo lançamento (global) ----------
@@ -1272,6 +1416,7 @@
   function fecharOverlay(overlay) {
     overlay.classList.remove("aberto");
     if (overlay === overlayDetalhe) clienteDetalheId = null;
+    if (overlay === overlayRecortarFoto && cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
   }
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") document.querySelectorAll(".overlay.aberto:not(#overlay-senha)").forEach(fecharOverlay);
