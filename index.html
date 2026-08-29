@@ -161,6 +161,7 @@
 
   /* filtros de período */
   .filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .filtros-periodos { display: flex; gap: 8px; }
   .filtros button {
     padding: 7px 12px;
     border-radius: 999px;
@@ -170,6 +171,7 @@
     font: inherit;
     font-size: 0.82rem;
     cursor: pointer;
+    flex-shrink: 0;
   }
   .filtros button.active { background: var(--text-primary); color: var(--page-bg); border-color: var(--text-primary); }
   .filtros .custom-range { display: flex; align-items: center; gap: 6px; margin-left: auto; }
@@ -344,7 +346,17 @@
 
   /* responsivo: telas médias (tablet) */
   @media (max-width: 640px) {
-    .filtros .custom-range { flex-basis: 100%; margin-left: 0; }
+    .filtros { flex-direction: column; align-items: stretch; }
+    .filtros-periodos {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .filtros-periodos::-webkit-scrollbar { display: none; }
+    .filtros-periodos button { padding: 6px 11px; font-size: 0.78rem; }
+    .filtros .custom-range { margin-left: 0; }
     .fab-add {
       position: fixed;
       right: 20px;
@@ -407,12 +419,14 @@
     <div class="section-title">Período</div>
     <div class="card" style="padding:14px 18px;">
       <div class="filtros" id="filtros-clientes" data-grupo="clientes">
-        <button data-periodo="tudo" class="active">Tudo</button>
-        <button data-periodo="hoje">Hoje</button>
-        <button data-periodo="7d">7 dias</button>
-        <button data-periodo="30d">30 dias</button>
-        <button data-periodo="mes">Este mês</button>
-        <button data-periodo="ano">Este ano</button>
+        <div class="filtros-periodos">
+          <button data-periodo="tudo" class="active">Tudo</button>
+          <button data-periodo="hoje">Hoje</button>
+          <button data-periodo="7d">7 dias</button>
+          <button data-periodo="30d">30 dias</button>
+          <button data-periodo="mes">Este mês</button>
+          <button data-periodo="ano">Este ano</button>
+        </div>
         <div class="custom-range">
           <input type="date" id="range-inicio-clientes">
           <span style="color:var(--text-muted); font-size:0.8rem;">até</span>
@@ -433,12 +447,14 @@
     <div class="section-title">Período</div>
     <div class="card" style="padding:14px 18px;">
       <div class="filtros" id="filtros-geral" data-grupo="geral">
-        <button data-periodo="tudo" class="active">Tudo</button>
-        <button data-periodo="hoje">Hoje</button>
-        <button data-periodo="7d">7 dias</button>
-        <button data-periodo="30d">30 dias</button>
-        <button data-periodo="mes">Este mês</button>
-        <button data-periodo="ano">Este ano</button>
+        <div class="filtros-periodos">
+          <button data-periodo="tudo" class="active">Tudo</button>
+          <button data-periodo="hoje">Hoje</button>
+          <button data-periodo="7d">7 dias</button>
+          <button data-periodo="30d">30 dias</button>
+          <button data-periodo="mes">Este mês</button>
+          <button data-periodo="ano">Este ano</button>
+        </div>
         <div class="custom-range">
           <input type="date" id="range-inicio-geral">
           <span style="color:var(--text-muted); font-size:0.8rem;">até</span>
